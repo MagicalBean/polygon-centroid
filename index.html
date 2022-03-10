@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Compiled and minified CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+
+    <!-- Compiled and minified JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <title>Polygon</title>
+  </head>
+  <body>
+    <h1 class="center">Polygon Drawing Tool</h1>
+    <canvas
+      id="canvas"
+      class="center"
+      width="900"
+      height="600"
+      style="
+        border: 4px solid black;
+        position: absolute;
+        left: 50%;
+        width: 900px;
+        height: 600px;
+        margin-top: 50px;
+        margin-left: -450px;
+      "
+    />
+
+    <script>
+      var canvas = document.getElementById("canvas");
+      var ctx = canvas.getContext("2d");
+      var cw = canvas.width;
+      var ch = canvas.height;
+
+      var gridSpacing = 25 / 2;
+
+      var toolType = "draw";
+
+      var points = [];
+      // points.push({ x: 100, y: 300 });
+      // points.push({ x: 150, y: 250 });
+      // points.push({ x: 235, y: 225 });
+      // points.push({ x: 190, y: 300 });
+      // points.push({ x: 80, y: 340 });
+
+      document.addEventListener("DOMContentLoaded", drawGrid());
+
+      document.addEventListener("keydown", (event) => {
+        //if (event.key === "Enter") start();
+        if (event.key === "s") toolType = "select";
+        if (event.key === "d") toolType = "draw";
+        if (event.key === "c") calculateCentriod();
+      });
+
+      document.addEventListener("dblclick", (event) => {
+        points.pop();
+        drawPolyline(points);
+        drawWaypoints(points);
+        calculateCentriod();
+      });
+
+      document.addEventListener("click", (event) => {
+        if (toolType == "draw") {
+          if (event.target != canvas) return;
+          console.log(event);
+          var rect = canvas.getBoundingClientRect();
+          var x = 0.5 + Math.round((((event.clientX - rect.left) / (rect.right - rect.left)) * cw) / 12.5) * 12.5;
+          var y = 0.5 + Math.round((((event.clientY - rect.top) / (rect.bottom - rect.top)) * ch) / 12.5) * 12.5;
+          drawCircle(x, y);
+          if (!points.includes({ x, y })) points.push({ x, y });
+        }
+      });
+
+      function calculateCentriod() {
+        var area = 0;
+        var Cx = 0;
+        var Cy = 0;
+
+        for (let i = 0; i < points.length; i++) {
+          var point = points[i];
+          var nextPoint = i == points.length - 1 ? points[0] : points[i + 1];
+          console.log(toP(point.x), toP(point.y));
+          let a = toP(point.x) * toP(nextPoint.y) - toP(nextPoint.x) * toP(point.y);
+          area += a;
+          Cx += (toP(point.x) + toP(nextPoint.x)) * a;
+          Cy += (toP(point.y) + toP(nextPoint.y)) * a;
+        }
+
+        area /= 2;
+        Cx = (1 / (6 * area)) * Cx;
+        Cy = (1 / (6 * area)) * Cy;
+        console.log(area.toFixed(3), Cx.toFixed(3), Cy.toFixed(3));
+        drawCentroid(Cx * 12.5 + 0.5, Cy * 12.5 + 0.5);
+      }
+
+      function toP(x) {
+        return (x - 0.5) / 12.5;
+      }
+
+      function start() {
+        drawGrid();
+        drawPolyline(points);
+      }
+
+      function drawPolyline(points) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (var i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.strokeStyle = "black";
+        ctx.closePath();
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+
+      function drawWaypoints(points) {
+        for (var i = 0; i < points.length; i++) {
+          drawCircle(points[i].x, points[i].y);
+        }
+      }
+
+      function drawCircle(x, y) {
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.fillStyle = "white";
+        ctx.fill();
+      }
+
+      function drawCentroid(x, y) {
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "white";
+        ctx.fill();
+
+        ctx.moveTo(x - 6, y);
+        ctx.lineTo(x + 6, y);
+
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x, y + 6);
+
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      function drawGrid() {
+        for (var x = 0; x <= cw; x += gridSpacing) {
+          ctx.moveTo(0.5 + x, 0);
+          ctx.lineTo(0.5 + x, ch);
+        }
+
+        for (var y = 0; y <= ch; y += gridSpacing) {
+          ctx.moveTo(0, 0.5 + y);
+          ctx.lineTo(cw, 0.5 + y);
+        }
+
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    </script>
+  </body>
+</html>
