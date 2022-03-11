@@ -26,6 +26,7 @@
         width: 900px;
         height: 600px;
         margin-top: 50px;
+        margin-bottom: 50px;
         margin-left: -450px;
       "
     />
@@ -40,7 +41,10 @@
 
       var toolType = "draw";
 
+      var shapes = [];
+
       var points = [];
+
       // points.push({ x: 100, y: 300 });
       // points.push({ x: 150, y: 250 });
       // points.push({ x: 235, y: 225 });
@@ -83,18 +87,20 @@
         for (let i = 0; i < points.length; i++) {
           var point = points[i];
           var nextPoint = i == points.length - 1 ? points[0] : points[i + 1];
-          console.log(toP(point.x), toP(point.y));
           let a = toP(point.x) * toP(nextPoint.y) - toP(nextPoint.x) * toP(point.y);
           area += a;
           Cx += (toP(point.x) + toP(nextPoint.x)) * a;
           Cy += (toP(point.y) + toP(nextPoint.y)) * a;
         }
 
-        area /= 2;
-        Cx = (1 / (6 * area)) * Cx;
-        Cy = (1 / (6 * area)) * Cy;
-        console.log(area.toFixed(3), Cx.toFixed(3), Cy.toFixed(3));
-        drawCentroid(Cx * 12.5 + 0.5, Cy * 12.5 + 0.5);
+        area = Math.abs(area / 2);
+
+        Cx = Math.abs((1 / (6 * area)) * Cx);
+        Cy = Math.abs((1 / (6 * area)) * Cy);
+        shapes.push({ area, Cx, Cy, points });
+        points = [];
+        console.log(shapes);
+        drawCentroid(Cx * 12.5 + 0.5, Cy * 12.5 + 0.5, area, Cx, Cy);
       }
 
       function toP(x) {
@@ -135,7 +141,7 @@
         ctx.fill();
       }
 
-      function drawCentroid(x, y) {
+      function drawCentroid(x, y, area, Cx, Cy) {
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);
         ctx.closePath();
@@ -154,6 +160,12 @@
         ctx.strokeStyle = "black";
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        ctx.font = "16px sans-serif";
+        ctx.fillStyle = "red";
+        ctx.textAlign = "center";
+        ctx.fillText("Area: " + area, x, y + 24);
+        ctx.fillText("Cx: " + parseFloat(Cx.toFixed(3)) + ", Cy: " + parseFloat(Cy.toFixed(3)), x, y - 24);
       }
 
       function drawGrid() {
