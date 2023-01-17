@@ -7,6 +7,7 @@
 
     <!-- Compiled and minified CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+    <link rel="stylesheet" href="style.css" />
 
     <!-- Compiled and minified JavaScript -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
@@ -14,22 +15,25 @@
   </head>
   <body>
     <h1 class="center">Polygon Drawing Tool</h1>
-    <canvas
-      id="canvas"
-      class="center"
-      width="900"
-      height="600"
-      style="
-        border: 4px solid black;
-        position: absolute;
-        left: 50%;
-        width: 900px;
-        height: 600px;
-        margin-top: 50px;
-        margin-bottom: 50px;
-        margin-left: -450px;
-      "
-    />
+    <h4 class="center">W: Draw&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E: Erase</h4>
+    <div>
+      <canvas
+        id="canvas"
+        width="900"
+        height="600"
+        style="
+          border: 4px solid black;
+          position: absolute;
+          left: 50%;
+          width: 900px;
+          height: 600px;
+          margin-top: 50px;
+          margin-bottom: 50px;
+          margin-left: -450px;
+          z-index: 0;
+        "
+      />
+    </div>
 
     <script>
       var canvas = document.getElementById("canvas");
@@ -42,8 +46,23 @@
       var toolType = "draw";
 
       var shapes = [];
+      var Shape = {
+        area: 0,
+        Cx: 0,
+        Cy: 0,
+        points: [],
+      };
 
-      var points = [];
+      var shapes = [];
+
+      // var shape = {
+      //   points: [{ x: 0, y: 0 }],
+      //   cm: 0,
+      //   area: 0,
+      //   isOpen: true,
+      // };
+
+      var mouseX, mouseY;
 
       // points.push({ x: 100, y: 300 });
       // points.push({ x: 150, y: 250 });
@@ -55,38 +74,63 @@
 
       document.addEventListener("keydown", (event) => {
         //if (event.key === "Enter") start();
-        if (event.key === "s") toolType = "select";
-        if (event.key === "d") toolType = "draw";
-        if (event.key === "c") calculateCentriod();
+        if (event.key === "e") toolType = "eraser";
+        if (event.key === "w") toolType = "draw";
+      });
+
+      document.addEventListener("mousemove", (event) => {
+        if (event.target != canvas) return;
+        var rect = canvas.getBoundingClientRect();
+        mouseX = 0.5 + Math.round((((event.clientX - rect.left) / (rect.right - rect.left)) * cw) / 12.5) * 12.5;
+        mouseY = 0.5 + Math.round((((event.clientY - rect.top) / (rect.bottom - rect.top)) * ch) / 12.5) * 12.5;
+
+        render();
       });
 
       document.addEventListener("dblclick", (event) => {
-        points.pop();
-        drawPolyline(points);
-        drawWaypoints(points);
-        calculateCentriod();
+        var shape = shapes.find((shape) => shape.isOpen);
+        shape.isOpen = false;
+        calculateCentriod(shape);
       });
 
       document.addEventListener("click", (event) => {
-        if (toolType == "draw") {
-          if (event.target != canvas) return;
-          console.log(event);
-          var rect = canvas.getBoundingClientRect();
-          var x = 0.5 + Math.round((((event.clientX - rect.left) / (rect.right - rect.left)) * cw) / 12.5) * 12.5;
-          var y = 0.5 + Math.round((((event.clientY - rect.top) / (rect.bottom - rect.top)) * ch) / 12.5) * 12.5;
-          drawCircle(x, y);
-          if (!points.includes({ x, y })) points.push({ x, y });
+        if (event.target != canvas) return;
+        if (toolType === "draw") {
+          var shape = shapes.find((shape) => shape.isOpen);
+          if (shape !== undefined) {
+            if (!shape.points.some((e) => JSON.stringify(e) === JSON.stringify({ x: mouseX, y: mouseY })))
+              shape.points.push({ x: mouseX, y: mouseY });
+          } else shapes.push({ points: [{ x: mouseX, y: mouseY }], cm: { x: 0, y: 0 }, area: 0, isOpen: true });
+        } else if (toolType === "eraser") {
+          shapes.forEach((shape) => {
+            if (shape.points.some((e) => JSON.stringify(e) === JSON.stringify({ x: mouseX, y: mouseY }))) {
+              erasePoint(shape);
+            }
+          });
         }
+        // console.log(shapes);
       });
 
-      function calculateCentriod() {
+      function render() {
+        ctx.clearRect(0, 0, cw, ch);
+        drawGrid();
+        shapes.forEach((shape) => {
+          if (shape.isOpen) return;
+          drawPolyline(shape);
+          drawCentroid(shape.cm.x * 12.5 + 0.5, shape.cm.y * 12.5 + 0.5, shape.area, shape.cm.x, shape.cm.y);
+        });
+        drawWaypoints();
+        drawPreview(mouseX, mouseY);
+      }
+
+      function calculateCentriod(shape) {
         var area = 0;
         var Cx = 0;
         var Cy = 0;
 
-        for (let i = 0; i < points.length; i++) {
-          var point = points[i];
-          var nextPoint = i == points.length - 1 ? points[0] : points[i + 1];
+        for (let i = 0; i < shape.points.length; i++) {
+          var point = shape.points[i];
+          var nextPoint = i == shape.points.length - 1 ? shape.points[0] : shape.points[i + 1];
           let a = toP(point.x) * toP(nextPoint.y) - toP(nextPoint.x) * toP(point.y);
           area += a;
           Cx += (toP(point.x) + toP(nextPoint.x)) * a;
@@ -97,26 +141,36 @@
 
         Cx = Math.abs((1 / (6 * area)) * Cx);
         Cy = Math.abs((1 / (6 * area)) * Cy);
-        shapes.push({ area, Cx, Cy, points });
-        points = [];
-        console.log(shapes);
-        drawCentroid(Cx * 12.5 + 0.5, Cy * 12.5 + 0.5, area, Cx, Cy);
+
+        shape.cm = { x: Cx, y: Cy };
+        shape.area = area;
       }
 
       function toP(x) {
         return (x - 0.5) / 12.5;
       }
 
-      function start() {
-        drawGrid();
-        drawPolyline(points);
+      function erasePoint(shape) {
+        shape.points.splice(
+          shape.points.findIndex((e) => JSON.stringify(e) === JSON.stringify({ x: mouseX, y: mouseY })),
+          1
+        );
+
+        if (shape.points.length <= 0) {
+          shapes.splice(
+            shapes.findIndex((e) => JSON.stringify(e) === JSON.stringify(shape)),
+            1
+          );
+        }
+
+        calculateCentriod(shape);
       }
 
-      function drawPolyline(points) {
+      function drawPolyline(shape) {
         ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (var i = 1; i < points.length; i++) {
-          ctx.lineTo(points[i].x, points[i].y);
+        ctx.moveTo(shape.points[0].x, shape.points[0].y);
+        for (var i = 1; i < shape.points.length; i++) {
+          ctx.lineTo(shape.points[i].x, shape.points[i].y);
         }
         ctx.strokeStyle = "black";
         ctx.closePath();
@@ -125,9 +179,21 @@
       }
 
       function drawWaypoints(points) {
-        for (var i = 0; i < points.length; i++) {
-          drawCircle(points[i].x, points[i].y);
-        }
+        shapes.forEach((shape) => {
+          shape.points.forEach((point) => drawCircle(point.x, point.y));
+        });
+      }
+
+      function drawPreview(x, y) {
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.closePath();
+        if (toolType === "draw") ctx.strokeStyle = "gray";
+        else if (toolType === "eraser") ctx.strokeStyle = "red";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.fillStyle = "gray";
+        ctx.fill();
       }
 
       function drawCircle(x, y) {
